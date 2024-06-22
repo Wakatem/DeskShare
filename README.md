@@ -1,8 +1,8 @@
-<center>
-<img src="generated_icon.webp" width="200" height="200"></img>
-</center>  
+<p align="center">
+    <img src="generated_icon.webp" alt="drawing" width="200"/>
+</p>
 
-# DeskShare
+<h1 align="center">DeskShare</h1>
 DeskShare is a lightweight system-tray application that allows you to easily share your selected virtual desktop on Windows. With DeskShare, you can easily share your preferred virtual desktop in any screen-cast tool or online meeting platform.
 `Note: The executable is not code-signed at the moment. Windows might throw a security warning as a result.`
 
