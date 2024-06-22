@@ -23,7 +23,7 @@ def get_window_coordinates(window_title):
         raise Exception(f"Window with title '{window_title}' not found.")
 
 
-def record_and_show_window(desktop_number):
+def record_and_show_window(desktop_number, fps=5):
     global stop_sharing
 
     primary_monitor = get_monitors()[0]
@@ -37,7 +37,11 @@ def record_and_show_window(desktop_number):
     broadcasting_window = AppView(win._hWnd)
 
     with mss.mss() as sct:
+        target_time_per_frame = 1.0 / fps-1
+        monitor = {"top": top, "left": left, "width": width, "height": height}
+        
         while not stop_sharing:
+            frame_start_time = time.time()
 
             # Avoid sharing screen when Task View is active
             active_window = gw.getActiveWindow()
@@ -50,14 +54,16 @@ def record_and_show_window(desktop_number):
             if current_desktop.number == desktop_number:
 
                 # Capture the window region
-                monitor = {"top": top, "left": left, "width": width, "height": height}
                 img = sct.grab(monitor)
                 frame = cv2.cvtColor(np.array(img), cv2.COLOR_BGRA2BGR)
 
                 cv2.imshow("DeskShare", frame)
 
-            # Allow for keyboard and mouse interrupt
-            cv2.waitKey(1)
+            elapsed_time = time.time() - frame_start_time
+            sleep_time = target_time_per_frame - elapsed_time
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            
 
     cv2.destroyAllWindows()
 
