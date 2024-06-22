@@ -1,0 +1,6 @@
+opencv-python
+pygetwindow
+mss
+pyvda
+screeninfo
+pystray
