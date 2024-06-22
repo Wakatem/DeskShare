@@ -11,6 +11,7 @@ import pystray
 from pystray import Icon as icon, Menu as menu, MenuItem as item
 from PIL import Image, ImageDraw
 import ctypes
+import threading
 
 def get_window_coordinates(window_title):
     # Get the window object for the specific app
@@ -55,6 +56,14 @@ def record_and_show_window(desktop_number):
 
 
 
+def update_desktops_menu(icon):
+    global desktop_items, quit_program
+    while not quit_program:
+        # Update the menu items to reflect the available virtual desktops
+        if len(desktop_items) != len(get_virtual_desktops()):
+            desktop_items = [item(f"Desktop {desktop.number}", select_desktop(desktop.number), checked=get_selected_desktop(desktop.number), radio=True) for desktop in get_virtual_desktops()]
+            icon.update_menu()
+        time.sleep(3)
 
 def get_selected_desktop(number):
     def inner(item):
@@ -78,8 +87,10 @@ def on_stop_sharing(icon, item):
     selected_desktop = 0
 
 def quit(icon, item):
-    global stop_sharing
+    global stop_sharing, update_thread, quit_program
     stop_sharing = True
+    quit_program = True
+    update_thread.join()
     icon.stop()
 
 
@@ -89,6 +100,7 @@ if __name__ == '__main__':
 
     selected_desktop = 0
     stop_sharing = False
+    quit_program = False
 
     # Create a menu with all available virtual desktops
     desktop_items = [item(f"Desktop {desktop.number}", select_desktop(desktop.number), checked=get_selected_desktop(desktop.number), radio=True) for desktop in get_virtual_desktops()]
@@ -103,4 +115,10 @@ if __name__ == '__main__':
     # Load the application icon
     icon_image = Image.open("icon.ico")
     tray_icon = icon('DeskShare', icon_image, menu=items_menu)
+
+    # Start update_desktops_menu in a separate thread
+    update_thread = threading.Thread(target=update_desktops_menu, args=(tray_icon,))
+    update_thread.daemon = True
+    update_thread.start()
+
     tray_icon.run()
