@@ -57,13 +57,16 @@ def record_and_show_window(desktop_number):
 
 
 def update_desktops_menu(icon):
-    global desktop_items, quit_program
+    global desktop_items, desktops_menu, quit_program
     while not quit_program:
         # Update the menu items to reflect the available virtual desktops
         if len(desktop_items) != len(get_virtual_desktops()):
             desktop_items = [item(f"Desktop {desktop.number}", select_desktop(desktop.number), checked=get_selected_desktop(desktop.number), radio=True) for desktop in get_virtual_desktops()]
+            items_list = list(icon.menu.items)
+            items_list[0] = item('Start Sharing', menu(*desktop_items))
+            icon.menu = menu(*items_list)
             icon.update_menu()
-        time.sleep(3)
+        time.sleep(2)
 
 def get_selected_desktop(number):
     def inner(item):
