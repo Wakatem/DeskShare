@@ -44,7 +44,7 @@ def get_window_coordinates(window_title):
 
 
 def grab(queue, stop_sharing, desktop_number):
-    fps = 30
+    fps = 60
     primary_monitor = get_monitors()[0]
     left, top, width, height = primary_monitor.x, primary_monitor.y, primary_monitor.width, primary_monitor.height
 
