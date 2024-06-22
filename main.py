@@ -32,12 +32,9 @@ def record_and_show_window(desktop_number):
     cv2.startWindowThread()
     cv2.namedWindow('DeskShare', cv2.WINDOW_NORMAL)
     cv2.setWindowProperty('DeskShare', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    # cv2.resizeWindow('DeskShare', width, height)
 
     win: gw.Win32Window = get_window_coordinates("DeskShare")
     app_view = AppView(win._hWnd)
-    new_desktop = VirtualDesktop.current()
-    app_view.move(new_desktop)
 
     with mss.mss() as sct:
         while not stop_sharing:
@@ -59,13 +56,16 @@ def record_and_show_window(desktop_number):
 def update_desktops_menu(icon):
     global desktop_items, desktops_menu, quit_program
     while not quit_program:
-        # Update the menu items to reflect the available virtual desktops
-        if len(desktop_items) != len(get_virtual_desktops()):
-            desktop_items = [item(f"Desktop {desktop.number}", select_desktop(desktop.number), checked=get_selected_desktop(desktop.number), radio=True) for desktop in get_virtual_desktops()]
-            items_list = list(icon.menu.items)
-            items_list[0] = item('Start Sharing', menu(*desktop_items))
-            icon.menu = menu(*items_list)
-            icon.update_menu()
+        try:
+            # Update the menu items to reflect the available virtual desktops
+            if len(desktop_items) != len(get_virtual_desktops()):
+                desktop_items = [item(f"Desktop {desktop.number}", select_desktop(desktop.number), checked=get_selected_desktop(desktop.number), radio=True) for desktop in get_virtual_desktops()]
+                items_list = list(icon.menu.items)
+                items_list[0] = item('Start Sharing', menu(*desktop_items))
+                icon.menu = menu(*items_list)
+                icon.update_menu()
+        except Exception as e:
+            print(f"An error occurred: {e}")
         time.sleep(2)
 
 def get_selected_desktop(number):
