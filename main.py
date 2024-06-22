@@ -66,6 +66,7 @@ def select_desktop(number):
     def inner(icon, item):
         global selected_desktop
         selected_desktop = number
+        icon.update_menu()
         record_and_show_window(number)
     return inner
 
@@ -95,10 +96,11 @@ if __name__ == '__main__':
 
     items_menu = menu(
         item('Start Sharing', desktops_menu),
-        item('Stop Sharing', on_stop_sharing),
+        item('Stop Sharing', on_stop_sharing, enabled=lambda item: selected_desktop != 0),
         item('Quit', quit)
     )
 
     # Load the application icon
     icon_image = Image.open("icon.ico")
-    icon('DeskShare', icon_image, menu=items_menu).run()
+    tray_icon = icon('DeskShare', icon_image, menu=items_menu)
+    tray_icon.run()
