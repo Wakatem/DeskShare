@@ -34,11 +34,21 @@ def record_and_show_window(desktop_number):
     cv2.setWindowProperty('DeskShare', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     win: gw.Win32Window = get_window_coordinates("DeskShare")
-    app_view = AppView(win._hWnd)
+    broadcasting_window = AppView(win._hWnd)
 
     with mss.mss() as sct:
         while not stop_sharing:
-            if VirtualDesktop.current().number == desktop_number:
+
+            # Avoid sharing screen when Task View is active
+            active_window = gw.getActiveWindow()
+            if active_window is not None and active_window.title == "Task View":
+                continue
+
+            
+            # Check if selected desktop is the current one
+            current_desktop = VirtualDesktop.current()
+            if current_desktop.number == desktop_number:
+
                 # Capture the window region
                 monitor = {"top": top, "left": left, "width": width, "height": height}
                 img = sct.grab(monitor)
