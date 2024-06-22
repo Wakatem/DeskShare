@@ -1,3 +1,4 @@
+import mss.windows
 import pygetwindow as gw
 import mss
 import time
@@ -12,6 +13,25 @@ from pystray import Icon as icon, Menu as menu, MenuItem as item
 from PIL import Image, ImageDraw
 import ctypes
 import threading
+from multiprocessing import Queue, Process, Value
+
+
+def resize_and_compress_frame(frame, target_width=1920):
+    # Convert raw bytes to a numpy array
+    img_np = np.array(frame)
+    
+    # Resize the frame
+    # height, width = img_np.shape[:2]
+    # target_height = int((target_width / width) * height)
+    # resized_img = cv2.resize(img_np, (target_width, target_height))
+    
+    # Compress the frame (e.g., JPEG compression)
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 95]
+    _, compressed_img = cv2.imencode('.jpg', img_np, encode_param)
+    
+    return cv2.imdecode(compressed_img, 1)
+
+
 
 def get_window_coordinates(window_title):
     # Get the window object for the specific app
@@ -23,49 +43,45 @@ def get_window_coordinates(window_title):
         raise Exception(f"Window with title '{window_title}' not found.")
 
 
-def record_and_show_window(desktop_number, fps=4):
-    global stop_sharing
-
+def grab(queue, stop_sharing, desktop_number):
+    fps = 30
     primary_monitor = get_monitors()[0]
     left, top, width, height = primary_monitor.x, primary_monitor.y, primary_monitor.width, primary_monitor.height
 
-    cv2.startWindowThread()
-    cv2.namedWindow('DeskShare', cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty('DeskShare', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
-    win: gw.Win32Window = get_window_coordinates("DeskShare")
-    broadcasting_window = AppView(win._hWnd)
-
+    monitor = {"top": top, "left": left, "width": width, "height": height}
+    
     with mss.mss() as sct:
-        target_time_per_frame = 1.0 / fps
-        monitor = {"top": top, "left": left, "width": width, "height": height}
-        
-        while not stop_sharing:
-            frame_start_time = time.time()
-
+        while not stop_sharing.value:
             # Avoid sharing screen when Task View is active
             active_window = gw.getActiveWindow()
             if active_window is not None and active_window.title == "Task View":
                 continue
 
-            
-            # Check if selected desktop is the current one
-            current_desktop = VirtualDesktop.current()
-            if current_desktop.number == desktop_number:
-
-                # Capture the window region
+            # Capture the window region if selected desktop is the current one
+            if VirtualDesktop.current().number == desktop_number:
                 img = sct.grab(monitor)
-                frame = cv2.cvtColor(np.array(img), cv2.COLOR_BGRA2BGR)
+                compressed_img = resize_and_compress_frame(img)
+                queue.put(compressed_img)
 
-                cv2.imshow("DeskShare", frame)
+            time.sleep(1/fps)
+    
+    print("Stopped capturing")
 
-            elapsed_time = time.time() - frame_start_time
-            sleep_time = target_time_per_frame - elapsed_time
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            
+
+def display(queue, stop_sharing):
+    cv2.namedWindow('DeskShare', cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty('DeskShare', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    while not stop_sharing.value:
+        if not queue.empty():
+            img = queue.get()
+            if img is not None:
+                img = np.array(img)
+                cv2.imshow("DeskShare", img)
+        cv2.waitKey(1)
 
     cv2.destroyAllWindows()
+    print("Stopped displaying")
 
 
 
@@ -92,22 +108,26 @@ def get_selected_desktop(number):
 
 def select_desktop(number):
     def inner(icon, item):
-        global selected_desktop
+        global selected_desktop, queue, stop_sharing
+        stop_sharing.value = False
         selected_desktop = number
         icon.update_menu()
-        record_and_show_window(number)
+
+        Process(target=grab, args=(queue, stop_sharing, selected_desktop,)).start()
+        Process(target=display, args=(queue, stop_sharing,)).start()
+
     return inner
 
 
 def on_stop_sharing(icon, item):
     global stop_sharing, selected_desktop
-    stop_sharing = True
+    stop_sharing.value = True
     icon.notify(f"Sharing has been stopped")
     selected_desktop = 0
 
 def quit(icon, item):
     global stop_sharing, update_thread, quit_program
-    stop_sharing = True
+    stop_sharing.value = True
     quit_program = True
     update_thread.join()
     icon.stop()
@@ -117,8 +137,9 @@ if __name__ == '__main__':
     # Make the application DPI aware to handle display scaling properly
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
+    queue: Queue = Queue()
     selected_desktop = 0
-    stop_sharing = False
+    stop_sharing = Value('b', False)
     quit_program = False
 
     # Create a menu with all available virtual desktops
