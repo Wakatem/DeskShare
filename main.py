@@ -23,7 +23,7 @@ def get_window_coordinates(window_title):
         raise Exception(f"Window with title '{window_title}' not found.")
 
 
-def record_and_show_window(desktop_number, fps=5):
+def record_and_show_window(desktop_number, fps=4):
     global stop_sharing
 
     primary_monitor = get_monitors()[0]
@@ -37,7 +37,7 @@ def record_and_show_window(desktop_number, fps=5):
     broadcasting_window = AppView(win._hWnd)
 
     with mss.mss() as sct:
-        target_time_per_frame = 1.0 / fps-1
+        target_time_per_frame = 1.0 / fps
         monitor = {"top": top, "left": left, "width": width, "height": height}
         
         while not stop_sharing:
