@@ -61,8 +61,8 @@ def get_window_coordinates(window_title):
 
 
 
-def share_desktop():
-    global fps, stop_sharing, selected_desktop
+def share_desktop(fps, stop_sharing, selected_desktop):
+    # global fps, stop_sharing, selected_desktop
 
     frame_interval = 1.0 / fps
     primary_monitor = get_monitors()[0]
@@ -122,12 +122,12 @@ def get_selected_desktop(number):
 
 def select_desktop(number):
     def inner(icon, item):
-        global selected_desktop, stop_sharing
+        global fps, selected_desktop, stop_sharing
         stop_sharing.value = False
         selected_desktop = number
         icon.update_menu()
         
-        share_desktop()
+        Process(target=share_desktop, args=(fps, stop_sharing, selected_desktop,)).start()
 
     return inner
 
@@ -151,9 +151,8 @@ if __name__ == '__main__':
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
     selected_desktop = 0
-    fps = 60
+    fps = 24
     stop_sharing = Value('b', False)
-    # stop_sharing = False
     quit_program = False
 
     # Create a menu with all available virtual desktops
