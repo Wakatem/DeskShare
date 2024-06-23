@@ -83,7 +83,6 @@ def share_desktop():
                 if VirtualDesktop.current().number == selected_desktop:
                     img = sct.grab(monitor)
                     img = np.array(img)
-                    # compressed_img = compress_frame(img, 95)
                     imgUMAT = cv2.UMat(img)
 
                     cv2.imshow("DeskShare", imgUMAT)
