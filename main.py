@@ -10,6 +10,7 @@ from pystray import Icon as icon, Menu as menu, MenuItem as item
 from PIL import Image
 import ctypes
 import threading
+import multiprocessing
 from multiprocessing import Process, Value
 import configparser
 
@@ -189,6 +190,8 @@ def quit(icon, item):
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
+    
     # Make the application DPI aware to handle display scaling properly
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
     config = load_config_ini('config.ini')
