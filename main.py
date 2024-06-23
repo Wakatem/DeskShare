@@ -6,19 +6,35 @@ import cv2
 import numpy as np
 from screeninfo import get_monitors
 from pyvda import AppView, get_apps_by_z_order, VirtualDesktop, get_virtual_desktops
-import win32gui
-import win32con
-import pystray
 from pystray import Icon as icon, Menu as menu, MenuItem as item
-from PIL import Image, ImageDraw
+from PIL import Image
 import ctypes
 import threading
-from multiprocessing import Queue, Process, Value
+from multiprocessing import Process, Value
+from pygame.locals import *
 
 
-def resize_and_compress_frame(frame, target_width=1920):
+def resize_frame(frame, target_width=1920):
     # Convert raw bytes to a numpy array
-    img_np = np.array(frame)
+    if not isinstance(frame, np.ndarray):
+        img_np = np.array(frame)
+    else:
+        img_np = frame
+    
+    # Resize the frame
+    height, width = img_np.shape[:2]
+    target_height = int((target_width / width) * height)
+    resized_img = cv2.resize(img_np, (target_width, target_height))
+    
+    return resized_img
+
+
+def compress_frame(frame, quality):
+    # Convert raw bytes to a numpy array
+    if not isinstance(frame, np.ndarray):
+        img_np = np.array(frame)
+    else:
+        img_np = frame
     
     # Resize the frame
     # height, width = img_np.shape[:2]
@@ -26,8 +42,8 @@ def resize_and_compress_frame(frame, target_width=1920):
     # resized_img = cv2.resize(img_np, (target_width, target_height))
     
     # Compress the frame (e.g., JPEG compression)
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 95]
-    _, compressed_img = cv2.imencode('.jpg', img_np, encode_param)
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+    _, compressed_img = cv2.imencode('.jpg', frame, encode_param)
     
     return cv2.imdecode(compressed_img, 1)
 
@@ -43,46 +59,45 @@ def get_window_coordinates(window_title):
         raise Exception(f"Window with title '{window_title}' not found.")
 
 
-def grab(queue, stop_sharing, desktop_number):
-    fps = 60
+
+
+def share_desktop():
+    global fps, stop_sharing, selected_desktop
+
+    frame_interval = 1.0 / fps
     primary_monitor = get_monitors()[0]
     left, top, width, height = primary_monitor.x, primary_monitor.y, primary_monitor.width, primary_monitor.height
-
+    
     monitor = {"top": top, "left": left, "width": width, "height": height}
-    
-    with mss.mss() as sct:
-        while not stop_sharing.value:
-            # Avoid sharing screen when Task View is active
-            active_window = gw.getActiveWindow()
-            if active_window is not None and active_window.title == "Task View":
-                continue
+    last_frame_time = time.time()
 
-            # Capture the window region if selected desktop is the current one
-            if VirtualDesktop.current().number == desktop_number:
-                img = sct.grab(monitor)
-                compressed_img = resize_and_compress_frame(img)
-                queue.put(compressed_img)
-
-            time.sleep(1/fps)
-    
-    print("Stopped capturing")
-
-
-def display(queue, stop_sharing):
     cv2.namedWindow('DeskShare', cv2.WINDOW_NORMAL)
     cv2.setWindowProperty('DeskShare', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    with mss.mss() as sct:
 
-    while not stop_sharing.value:
-        if not queue.empty():
-            img = queue.get()
-            if img is not None:
-                img = np.array(img)
-                cv2.imshow("DeskShare", img)
-        cv2.waitKey(1)
+        while not stop_sharing.value:
+            activeWindow = gw.getActiveWindow()
 
+            # Avoid capturing the Task View window
+            if activeWindow and activeWindow.title != "Task View":
+                if VirtualDesktop.current().number == selected_desktop:
+                    img = sct.grab(monitor)
+                    img = np.array(img)
+                    compressed_img = compress_frame(img, 95)
+                    imgUMAT = cv2.UMat(compressed_img)
+
+                    cv2.imshow("DeskShare", imgUMAT)
+
+            # Calculate sleep time to maintain target FPS
+            sleep_time = frame_interval - (time.time() - last_frame_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+            last_frame_time = time.time()
+            cv2.waitKey(1)
+    
     cv2.destroyAllWindows()
-    print("Stopped displaying")
-
+    print("Stopped sharing")
 
 
 def update_desktops_menu(icon):
@@ -108,13 +123,12 @@ def get_selected_desktop(number):
 
 def select_desktop(number):
     def inner(icon, item):
-        global selected_desktop, queue, stop_sharing
+        global selected_desktop, stop_sharing
         stop_sharing.value = False
         selected_desktop = number
         icon.update_menu()
-
-        Process(target=grab, args=(queue, stop_sharing, selected_desktop,)).start()
-        Process(target=display, args=(queue, stop_sharing,)).start()
+        
+        share_desktop()
 
     return inner
 
@@ -137,9 +151,10 @@ if __name__ == '__main__':
     # Make the application DPI aware to handle display scaling properly
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
-    queue: Queue = Queue()
     selected_desktop = 0
+    fps = 60
     stop_sharing = Value('b', False)
+    # stop_sharing = False
     quit_program = False
 
     # Create a menu with all available virtual desktops
