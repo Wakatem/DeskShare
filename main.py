@@ -88,7 +88,7 @@ def share_desktop(fps, stop_sharing, selected_desktop):
 
     cv2.namedWindow('DeskShare', cv2.WINDOW_NORMAL)
     cv2.setWindowProperty('DeskShare', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    with mss.mss() as sct:
+    with mss.mss(with_cursor=True) as sct:
 
         while not stop_sharing.value:
             frame_interval = 1.0 / fps.value
@@ -97,25 +97,22 @@ def share_desktop(fps, stop_sharing, selected_desktop):
             # Avoid capturing the Task View window
             if activeWindow and activeWindow.title != "Task View":
                 if VirtualDesktop.current().number == selected_desktop:
-                    img = sct.grab(monitor)
-                    img = np.array(img)
-                    imgUMAT = cv2.UMat(img)
-
-                    cv2.imshow("DeskShare", imgUMAT)
+                    img = np.asarray(sct.grab(monitor))
+                    cv2.imshow("DeskShare", img)
             
             # Print calculated fps
-            # calculated_fps = 1.0 / (current_time - last_frame_time)
+            current_time = time.time()
+            calculated_fps = 1.0 / (current_time - last_frame_time)
             
             # # Move cursor up one line and clear line
-            # print("\033[A\033[K", end="")  # Move up and clear the line
-            # print(f"FPS: {calculated_fps:.2f}", end="\r\n")  # Print new first line
+            print("\033[A\033[K", end="")  # Move up and clear the line
+            print(f"FPS: {calculated_fps:.2f}", end="\r")  # Print new first line
 
             # # Clear the next line and print
             # print("\033[K", end="")  # Clear the line
             # print(f"Active Window: {activeWindow.title if activeWindow else 'None'}", end="\r")
 
             # Calculate sleep time to maintain target FPS
-            current_time = time.time()
             sleep_time = frame_interval - (current_time - last_frame_time)
             if sleep_time > 0:
                 time.sleep(sleep_time)
@@ -190,8 +187,7 @@ def quit(icon, item):
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
-    
+
     # Make the application DPI aware to handle display scaling properly
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
     config = load_config_ini('config.ini')
